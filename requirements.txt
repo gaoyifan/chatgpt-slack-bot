@@ -1,0 +1,4 @@
+slack_bolt
+aiohttp
+openai~=1.6.1
+pyautogen
