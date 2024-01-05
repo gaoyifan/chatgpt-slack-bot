@@ -15,7 +15,7 @@ slack = AsyncApp(token=os.environ.get("SLACK_BOT_TOKEN"))
 openai = OpenAIWrapper()
 
 
-def gen_prompts(thread_msgs: List[Dict]):
+def generate_prompts(thread_msgs: List[Dict]):
     yield {"role": "system", "content": "You are a helpful assistant."}
     for message in thread_msgs:
         if "bot_id" in message:
@@ -27,7 +27,7 @@ def gen_prompts(thread_msgs: List[Dict]):
 
 
 @slack.event("message")
-async def reply_with_gpt(context: AsyncBoltContext, event: Dict, say: AsyncSay, client: AsyncWebClient):
+async def message_handler(context: AsyncBoltContext, event: Dict, say: AsyncSay, client: AsyncWebClient):
     async def update_response():
         nonlocal slack_message, response, thread_ts
         if slack_message is None:
@@ -40,7 +40,7 @@ async def reply_with_gpt(context: AsyncBoltContext, event: Dict, say: AsyncSay, 
         return
     thread_ts = event.get("thread_ts") or event["ts"]
     thread_msgs = await client.conversations_replies(channel=event["channel"], ts=thread_ts)
-    prompts = list(gen_prompts(thread_msgs["messages"]))
+    prompts = list(generate_prompts(thread_msgs["messages"]))
     slack_message: AsyncSlackResponse = None
     response = ""
     last_send_time = datetime.now()
