@@ -1,6 +1,7 @@
 import asyncio
 import os
-from typing import Callable, Dict, Any, List, AsyncGenerator, AsyncIterator
+from pprint import pprint
+from typing import Callable, Dict, Any, List, AsyncGenerator, AsyncIterator, Annotated
 from openai import AsyncOpenAI
 from autogen.function_utils import get_function_schema
 import json
@@ -116,3 +117,26 @@ class OpenAIWrapper:
             return func
 
         return decorator
+
+
+@OpenAIWrapper.add_schema("A timer function.")
+async def timer(num_seconds: Annotated[int, "Number of seconds in the timer."]) -> str:
+    await asyncio.sleep(num_seconds)
+    return "Timer is done!"
+
+
+async def main():
+    async with OpenAIWrapper() as client:
+        client.add_function(timer)
+        print(f"function schema: {client._get_tools_schema()}")
+        prompts = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Set a timer for 3 seconds and 5 seconds in parallel."},
+        ]
+        async for r in client.generate_reply(prompts):
+            print(r, end="", flush=True)
+        pprint(prompts)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
