@@ -44,11 +44,15 @@ async def reply_with_gpt(context: AsyncBoltContext, event: Dict, say: AsyncSay, 
     slack_message: AsyncSlackResponse = None
     response = ""
     last_send_time = datetime.now()
-    async for delta in openai.generate_reply(prompts):
-        response += delta
-        if (datetime.now() - last_send_time).total_seconds() > 1:
-            await update_response()
-            last_send_time = datetime.now()
+    try:
+        async for delta in openai.generate_reply(prompts):
+            response += delta
+            if (datetime.now() - last_send_time).total_seconds() > 1:
+                await update_response()
+                last_send_time = datetime.now()
+    except Exception as e:
+        response += f"(Exception in function call: {e})"
+        logging.error("Exception in function call: %s", e)
     await update_response()
 
 
