@@ -3,6 +3,7 @@ import os
 import asyncio
 from slack_bolt.async_app import AsyncApp, AsyncBoltContext, AsyncSay
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
+from slack_sdk.models.metadata import Metadata
 from slack_sdk.web.async_slack_response import AsyncSlackResponse
 from slack_sdk.web.async_client import AsyncWebClient
 from pprint import pprint
@@ -19,6 +20,10 @@ def generate_prompts(thread_msgs: List[Dict]):
     yield {"role": "system", "content": "You are a helpful assistant."}
     for message in thread_msgs:
         if "bot_id" in message:
+            additional_prompts = message.get("metadata", {}).get("event_payload", {}).get("additional_prompts")
+            if additional_prompts:  # load tool call context from message metadata
+                for m in additional_prompts:
+                    yield m
             yield {"role": "assistant", "content": message["text"]}
         elif "user" in message:
             yield {"role": "user", "content": message["text"]}
@@ -29,21 +34,27 @@ def generate_prompts(thread_msgs: List[Dict]):
 @slack.event("message")
 async def message_handler(context: AsyncBoltContext, event: Dict, say: AsyncSay, client: AsyncWebClient):
     async def update_response():
-        nonlocal slack_message, response, thread_ts
+        nonlocal slack_message, response, thread_ts, additional_prompts
+        metadata = None
+        if additional_prompts:  # add tool call context into message metadata
+            metadata = Metadata("tool_call", {"additional_prompts": additional_prompts})
         if slack_message is None:
-            slack_message = await say(response, thread_ts=thread_ts, username="AI Assistant")
+            slack_message = await say(response, thread_ts=thread_ts, username="AI Assistant", metadata=metadata)
         else:
-            await client.chat_update(channel=slack_message["channel"], ts=slack_message["ts"], text=response)
+            await client.chat_update(channel=slack_message["channel"], ts=slack_message["ts"], text=response,
+                                     metadata=metadata)
 
     if "hidden" in event:
         print(context.bot_id)
         return
     thread_ts = event.get("thread_ts") or event["ts"]
-    thread_msgs = await client.conversations_replies(channel=event["channel"], ts=thread_ts)
+    thread_msgs = await client.conversations_replies(channel=event["channel"], ts=thread_ts, include_all_metadata=True)
     prompts = list(generate_prompts(thread_msgs["messages"]))
     slack_message: AsyncSlackResponse = None
     response = ""
     last_send_time = datetime.now()
+    old_prompts_len = len(prompts)
+    additional_prompts = []
     try:
         async for delta in openai.generate_reply(prompts):
             response += delta
@@ -53,6 +64,8 @@ async def message_handler(context: AsyncBoltContext, event: Dict, say: AsyncSay,
     except Exception as e:
         response += f"(Exception in function call: {e})"
         logging.error("Exception in function call: %s", e)
+    if len(prompts) > old_prompts_len:
+        additional_prompts = prompts[old_prompts_len:]
     await update_response()
 
 
