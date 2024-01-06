@@ -1,4 +1,5 @@
 slack_bolt
 aiohttp
 openai~=1.6.1
-pyautogen
+pyautogen @ git+https://github.com/microsoft/autogen@v0.2.3
+pony
