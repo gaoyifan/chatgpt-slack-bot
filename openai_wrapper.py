@@ -3,7 +3,7 @@ import os
 from pprint import pprint
 from typing import Callable, Dict, Any, List, AsyncGenerator, AsyncIterator, Annotated
 from openai import AsyncOpenAI
-from autogen.function_utils import get_function_schema
+from plugin import add_schema
 import json
 import logging
 
@@ -109,17 +109,8 @@ class OpenAIWrapper:
             stream=True,
         )
 
-    @staticmethod
-    def add_schema(description: str):
-        def decorator(func: Callable):
-            schema = get_function_schema(func, description=description)
-            setattr(func, 'schema', schema)
-            return func
 
-        return decorator
-
-
-@OpenAIWrapper.add_schema("A timer function.")
+@add_schema("A timer function.")
 async def timer(num_seconds: Annotated[int, "Number of seconds in the timer."]) -> str:
     await asyncio.sleep(num_seconds)
     return "Timer is done!"

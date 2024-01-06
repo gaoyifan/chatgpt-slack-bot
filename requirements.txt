@@ -3,3 +3,4 @@ aiohttp
 openai~=1.6.1
 pyautogen @ git+https://github.com/microsoft/autogen@v0.2.3
 pony
+httpx[http2]

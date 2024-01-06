@@ -11,6 +11,8 @@ from datetime import datetime
 from openai_wrapper import OpenAIWrapper
 from pony.orm import *
 
+from plugins.browsing import browser_text, github, pdf, youtube
+
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 slack = AsyncApp(token=os.environ.get("SLACK_BOT_TOKEN"))
 openai = OpenAIWrapper()
@@ -86,12 +88,6 @@ async def message_handler(context: AsyncBoltContext, event: Dict, say: AsyncSay,
     await update_response()
 
 
-@OpenAIWrapper.add_schema("A timer function.")
-async def timer(num_seconds: Annotated[int, "Number of seconds in the timer."]) -> str:
-    await asyncio.sleep(num_seconds)
-    return "Timer is done!"
-
-
 # clear all messages in the IM
 @slack.command("/clear")
 async def clear_all_history(ack, body, client: AsyncWebClient):
@@ -113,7 +109,10 @@ async def clear_all_history(ack, body, client: AsyncWebClient):
 
 
 async def main():
-    openai.add_function(timer)
+    openai.add_function(browser_text)
+    openai.add_function(github)
+    openai.add_function(pdf)
+    openai.add_function(youtube)
     await AsyncSocketModeHandler(slack, os.environ["SLACK_APP_TOKEN"]).start_async()
 
 
