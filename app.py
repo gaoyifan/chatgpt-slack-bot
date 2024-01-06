@@ -18,15 +18,15 @@ openai = OpenAIWrapper()
 
 def generate_prompts(thread_msgs: List[Dict]):
     yield {"role": "system", "content": "You are a helpful assistant."}
-    for message in thread_msgs:
-        if "bot_id" in message:
-            additional_prompts = message.get("metadata", {}).get("event_payload", {}).get("additional_prompts")
+    for msg in thread_msgs:
+        if "bot_id" in msg:
+            additional_prompts = msg.get("metadata", {}).get("event_payload", {}).get("additional_prompts")
             if additional_prompts:  # load tool call context from message metadata
                 for m in additional_prompts:
                     yield m
-            yield {"role": "assistant", "content": message["text"]}
-        elif "user" in message:
-            yield {"role": "user", "content": message["text"]}
+            yield {"role": "assistant", "content": msg["text"]}
+        elif "user" in msg:
+            yield {"role": "user", "content": msg["text"]}
         else:
             print("Unknown message type")
 
@@ -34,14 +34,14 @@ def generate_prompts(thread_msgs: List[Dict]):
 @slack.event("message")
 async def message_handler(context: AsyncBoltContext, event: Dict, say: AsyncSay, client: AsyncWebClient):
     async def update_response():
-        nonlocal slack_message, response, thread_ts, additional_prompts
+        nonlocal slack_msg, response, thread_ts, additional_prompts
         metadata = None
         if additional_prompts:  # add tool call context into message metadata
             metadata = Metadata("tool_call", {"additional_prompts": additional_prompts})
-        if slack_message is None:
-            slack_message = await say(response, thread_ts=thread_ts, username="AI Assistant", metadata=metadata)
+        if slack_msg is None:
+            slack_msg = await say(response, thread_ts=thread_ts, username="AI Assistant", metadata=metadata)
         else:
-            await client.chat_update(channel=slack_message["channel"], ts=slack_message["ts"], text=response,
+            await client.chat_update(channel=slack_msg["channel"], ts=slack_msg["ts"], text=response,
                                      metadata=metadata)
 
     if "hidden" in event:
@@ -50,7 +50,7 @@ async def message_handler(context: AsyncBoltContext, event: Dict, say: AsyncSay,
     thread_ts = event.get("thread_ts") or event["ts"]
     thread_msgs = await client.conversations_replies(channel=event["channel"], ts=thread_ts, include_all_metadata=True)
     prompts = list(generate_prompts(thread_msgs["messages"]))
-    slack_message: AsyncSlackResponse = None
+    slack_msg: AsyncSlackResponse = None
     response = ""
     last_send_time = datetime.now()
     old_prompts_len = len(prompts)
@@ -86,11 +86,11 @@ async def clear_all_history(ack, body, client: AsyncWebClient):
 
     await ack()
     h = await client.conversations_history(channel=body["channel_id"])
-    for message in h["messages"]:
-        if message.get("bot_id"):
-            await try_delete(body["channel_id"], message["ts"])
+    for msg in h["messages"]:
+        if msg.get("bot_id"):
+            await try_delete(body["channel_id"], msg["ts"])
         else:
-            replies = await client.conversations_replies(channel=body["channel_id"], ts=message["ts"])
+            replies = await client.conversations_replies(channel=body["channel_id"], ts=msg["ts"])
             for reply in replies["messages"]:
                 await try_delete(body["channel_id"], reply["ts"])
 
