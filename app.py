@@ -32,7 +32,7 @@ db.generate_mapping(create_tables=True, check_tables=True)
 
 @db_session
 def get_tool_call_prompts(msg_ts):
-    prompt = SlackToolCallPrompt[msg_ts]
+    prompt = SlackToolCallPrompt.get(ts=msg_ts)
     return prompt.prompts if prompt else []
 
 
