@@ -32,7 +32,7 @@ class OpenAIWrapper:
                 self.available_funcs.values()] if self.available_funcs else None
 
     async def _execute_function(self, tool_calls: List[Dict[str, Any]]) -> AsyncIterator[Dict[str, Any]]:
-        for tool_call in tool_calls:
+        async def execute_tool_call(tool_call):
             id = tool_call["id"]
             func = tool_call["function"]
             func_name = func["name"]
@@ -42,12 +42,17 @@ class OpenAIWrapper:
                 func_return = await func_to_call(**func_args)
             else:
                 func_return = func_to_call(**func_args)
-            yield {
+            return {
                 "tool_call_id": id,
                 "role": "tool",
                 "name": func_name,
                 "content": func_return,
             }
+
+        coroutines = [execute_tool_call(tool_call) for tool_call in tool_calls]
+        results = await asyncio.gather(*coroutines)
+        for result in results:
+            yield result
 
     async def generate_reply(self, msg_history: List[Dict[str, Any]]) -> AsyncGenerator[str, None]:
         logging.debug("msg_history: %s", msg_history)
@@ -112,7 +117,9 @@ class OpenAIWrapper:
 
 @add_schema("A timer function.")
 async def timer(num_seconds: Annotated[int, "Number of seconds in the timer."]) -> str:
+    print(f"Timer started for {num_seconds} seconds.")
     await asyncio.sleep(num_seconds)
+    print(f"Timer done for {num_seconds} seconds.")
     return "Timer is done!"
 
 
