@@ -26,7 +26,7 @@ class SlackToolCallPrompt(db.Entity):
     prompts = Required(Json)
 
 
-db.bind(provider='sqlite', filename='db.sqlite', create_db=True)
+db.bind(provider="sqlite", filename="db.sqlite", create_db=True)
 db.generate_mapping(create_tables=True, check_tables=True)
 
 

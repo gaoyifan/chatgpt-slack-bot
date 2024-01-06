@@ -9,7 +9,6 @@ import logging
 
 
 class OpenAIWrapper:
-
     def __init__(self):
         self.available_funcs: Dict[str, Callable] = {}
         api_key = os.getenv("OPENAI_API_KEY")
@@ -28,8 +27,10 @@ class OpenAIWrapper:
         self.available_funcs[func.schema["name"]] = func
 
     def _get_tools_schema(self):
-        return [{"type": "function", "function": func.schema} for func in
-                self.available_funcs.values()] if self.available_funcs else None
+        if not self.available_funcs:
+            # openai.chat.completions.create() will fail with tools={}, so we return None instead
+            return None
+        return [{"type": "function", "function": func.schema} for func in self.available_funcs.values()]
 
     async def _execute_function(self, tool_calls: List[Dict[str, Any]]) -> AsyncIterator[Dict[str, Any]]:
         async def execute_tool_call(tool_call):
@@ -72,16 +73,14 @@ class OpenAIWrapper:
                             assert tool_call.type == "function"
                             pending_tool_calls.append(tool_call.model_dump())
                         else:  # existing tool call in streaming response
-                            pending_tool_calls[tool_call.index]['function']['arguments'] += tool_call.function.arguments
+                            pending_tool_calls[tool_call.index]["function"]["arguments"] += tool_call.function.arguments
                 match choice.finish_reason:
                     case "length":
                         yield "(Response truncated due to length limit)"
                     case "content_filter":
                         yield "(Request omitted due to content filter)"
                     case "tool_calls":
-                        msg_history.append({
-                            "role": "assistant",
-                            "tool_calls": pending_tool_calls})
+                        msg_history.append({"role": "assistant", "tool_calls": pending_tool_calls})
                         logging.debug("pending_tool_calls: %s", pending_tool_calls)
                         async for content in self.generate_reply(msg_history):
                             yield content
