@@ -69,7 +69,7 @@ async def message_handler(event: Dict, say: AsyncSay, client: AsyncWebClient):
     except SlackApiError:
         logging.error("Failed to fetch thread messages. channel: %s, ts: %s", channel, thread_ts)
         pprint(event)
-    prompts = list(generate_prompts(thread_msgs["messages"], channel))
+    prompts = list(generate_prompts(thread_msgs["messages"]))
     response = ""
     last_send_time = datetime.now()
     old_prompts_len = len(prompts)
