@@ -43,7 +43,7 @@ def add_tool_call_prompts(channel, msg_ts, prompts, thread_ts=None):
     SlackToolCallPrompt(channel=channel, ts=msg_ts, thread_ts=thread_ts, prompts=prompts)
 
 
-def generate_prompts(thread_msgs: List[Dict], channel: str):
+def generate_prompts(thread_msgs: List[Dict]):
     yield {"role": "system", "content": "You are a helpful assistant."}
     for msg in thread_msgs:
         for p in get_tool_call_prompts(msg["ts"]):
@@ -57,7 +57,7 @@ def generate_prompts(thread_msgs: List[Dict], channel: str):
 
 
 @slack.event("message")
-async def message_handler(context: AsyncBoltContext, event: Dict, say: AsyncSay, client: AsyncWebClient):
+async def message_handler(event: Dict, say: AsyncSay, client: AsyncWebClient):
     logging.debug("event: %s", event)
     if "hidden" in event:
         logging.debug("hidden message")
