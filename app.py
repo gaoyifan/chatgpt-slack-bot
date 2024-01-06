@@ -1,16 +1,18 @@
+import asyncio
 import logging
 import os
-import asyncio
-from slack_bolt.async_app import AsyncApp, AsyncBoltContext, AsyncSay
-from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
-from slack_sdk.web.async_slack_response import AsyncSlackResponse
-from slack_sdk.web.async_client import AsyncWebClient
-from pprint import pprint
-from typing import Dict, List, Annotated
+import traceback
 from datetime import datetime
-from openai_wrapper import OpenAIWrapper
-from pony.orm import *
+from pprint import pprint
+from typing import Dict, List
 
+from pony.orm import *
+from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
+from slack_bolt.async_app import AsyncApp, AsyncBoltContext, AsyncSay
+from slack_sdk.errors import SlackApiError
+from slack_sdk.web.async_client import AsyncWebClient
+
+from openai_wrapper import OpenAIWrapper
 from plugins.browsing import browser_text, github, pdf, youtube
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))

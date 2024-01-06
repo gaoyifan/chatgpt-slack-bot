@@ -1,11 +1,13 @@
 import asyncio
-import os
-from pprint import pprint
-from typing import Callable, Dict, Any, List, AsyncGenerator, AsyncIterator, Annotated
-from openai import AsyncOpenAI
-from plugin import add_schema
 import json
 import logging
+import os
+from pprint import pprint
+from typing import Annotated, Any, AsyncGenerator, AsyncIterator, Callable, Dict, List
+
+from openai import AsyncOpenAI
+
+from plugin import add_schema
 
 
 class OpenAIWrapper:

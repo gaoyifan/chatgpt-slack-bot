@@ -1,9 +1,10 @@
+import asyncio
 import json
 import os
-import asyncio
-from httpx import AsyncClient, ReadTimeout
 from json import JSONDecodeError
 from typing import Annotated
+
+from httpx import AsyncClient, ReadTimeout
 
 from plugin import add_schema
 
