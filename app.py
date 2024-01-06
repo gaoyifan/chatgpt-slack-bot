@@ -56,36 +56,35 @@ def generate_prompts(thread_msgs: List[Dict], channel: str):
 
 @slack.event("message")
 async def message_handler(context: AsyncBoltContext, event: Dict, say: AsyncSay, client: AsyncWebClient):
-    async def update_response():
-        nonlocal slack_msg, response, thread_ts
-        if slack_msg is None:
-            slack_msg = await say(response, thread_ts=thread_ts, username="AI Assistant")
-        else:
-            await client.chat_update(channel=slack_msg["channel"], ts=slack_msg["ts"], text=response)
-
+    logging.debug("event: %s", event)
     if "hidden" in event:
-        print(context.bot_id)
+        logging.debug("hidden message")
         return
     channel = event["channel"]
     thread_ts = event.get("thread_ts") or event["ts"]
-    thread_msgs = await client.conversations_replies(channel=channel, ts=thread_ts)
+    try:
+        thread_msgs = await client.conversations_replies(channel=channel, ts=thread_ts)
+    except SlackApiError:
+        logging.error("Failed to fetch thread messages. channel: %s, ts: %s", channel, thread_ts)
+        pprint(event)
     prompts = list(generate_prompts(thread_msgs["messages"], channel))
-    slack_msg: AsyncSlackResponse = None
     response = ""
     last_send_time = datetime.now()
     old_prompts_len = len(prompts)
+    response_msg = await say("(Thinking...)", thread_ts=thread_ts, username="AI Assistant")
     try:
         async for delta in openai.generate_reply(prompts):
             response += delta
             if (datetime.now() - last_send_time).total_seconds() > 1:
-                await update_response()
+                await client.chat_update(channel=channel, ts=response_msg["ts"], text=response)
                 last_send_time = datetime.now()
     except Exception as e:
-        response += f"(Exception in function call: {e})"
-        logging.error("Exception in function call: %s", e)
+        response += f"(Exception when generating reply: {e})"
+        logging.error("Exception when generating reply: %s", e)
+        traceback.print_exc()
     if len(prompts) > old_prompts_len:  # new tool calls from assistant
-        add_tool_call_prompts(channel, slack_msg["ts"], prompts[old_prompts_len:], thread_ts)
-    await update_response()
+        add_tool_call_prompts(channel, response_msg["ts"], prompts[old_prompts_len:], thread_ts)
+    await client.chat_update(channel=channel, ts=response_msg["ts"], text=response)
 
 
 # clear all messages in the IM
