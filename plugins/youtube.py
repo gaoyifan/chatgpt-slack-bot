@@ -1,11 +1,17 @@
 import json
 import logging
+import os
 import tempfile
-import yt_dlp
 from typing import Annotated
+
+from openai import AsyncOpenAI
+import yt_dlp
+
 from plugin import add_schema
 
 max_result_length = 6291556
+openai_audio_model = os.getenv("OPENAI_AUDIO_MODEL", "whisper-1")
+openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 def result_length(r):
@@ -66,35 +72,61 @@ async def youtube(url: Annotated[str, "URL of the YouTube video."]) -> str:
                     subtitle = "autosub", lang
                     break
 
-        if subtitle is None:
-            raise ValueError("No subtitle found")
-    logging.debug("subtitle: %s, %s", subtitle[0], subtitle[1])
+        if subtitle is None:  # download audio and transcribe
+            # Instead of raising an error, now it tries to download and transcribe the audio.
+            with tempfile.TemporaryDirectory() as tmpdir:
+                audio_tmpl = f"{tmpdir}/audio.%(ext)s"
+                audio_path = f"{tmpdir}/audio.mp3"
+                audio_options = {
+                    "format": "bestaudio/best",
+                    "outtmpl": audio_tmpl,
+                    "postprocessors": [
+                        {
+                            "key": "FFmpegExtractAudio",
+                            "preferredcodec": "mp3",
+                            "preferredquality": "192",
+                        }
+                    ],
+                }
+                with yt_dlp.YoutubeDL(audio_options) as ydl:
+                    ydl.download([url])
+                try:
+                    with open(audio_path, "rb") as audio_file:
+                        transcript_response = await openai_client.audio.transcriptions.create(
+                            model=openai_audio_model,
+                            file=audio_file,
+                        )
+                    transcript = transcript_response.text
+                    logging.debug("transcript success")
+                except Exception as e:
+                    logging.error(f"Error in transcribing audio: {e}")
+                    raise ValueError("Audio transcription failed")
+        else:  # download subtitle
+            with tempfile.TemporaryDirectory() as tmpdir:
+                options = {
+                    "outtmpl": f"{tmpdir}/output.%(ext)s",
+                    "skip_download": True,
+                    "subtitleslangs": [subtitle[1]],
+                    "subtitlesformat": "json3",
+                }
+                if subtitle[0] == "sub":
+                    options["writesubtitles"] = True
+                elif subtitle[0] == "autosub":
+                    options["writeautomaticsub"] = True
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        options = {
-            "outtmpl": f"{tmpdir}/output.%(ext)s",
-            "skip_download": True,
-            "subtitleslangs": [subtitle[1]],
-            "subtitlesformat": "json3",
-        }
-        if subtitle[0] == "sub":
-            options["writesubtitles"] = True
-        elif subtitle[0] == "autosub":
-            options["writeautomaticsub"] = True
+                with yt_dlp.YoutubeDL(options) as ydl:
+                    ydl.download([url])
 
-        with yt_dlp.YoutubeDL(options) as ydl:
-            ydl.download([url])
-
-        with open(f"{tmpdir}/output.{subtitle[1]}.json3") as f:
-            json3 = json.load(f)
-            subtitle_lines = []
-            for event in json3["events"]:
-                if "segs" in event:
-                    line = "".join([seg["utf8"] for seg in event["segs"]]).strip()
-                    if line:
-                        subtitle_lines.append(line)
-
-    transcript = "\n".join(subtitle_lines)
+                with open(f"{tmpdir}/output.{subtitle[1]}.json3") as f:
+                    json3 = json.load(f)
+                    subtitle_lines = []
+                    for event in json3["events"]:
+                        if "segs" in event:
+                            line = "".join([seg["utf8"] for seg in event["segs"]]).strip()
+                            if line:
+                                subtitle_lines.append(line)
+            transcript = "\n".join(subtitle_lines)
+            logging.debug("subtitle: %s, %s", subtitle[0], subtitle[1])
 
     result = {
         "data": data,
