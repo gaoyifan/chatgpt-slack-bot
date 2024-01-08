@@ -13,7 +13,8 @@ from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
 
 from openai_wrapper import OpenAIWrapper
-from plugins.browsing import browser_text, github, pdf, youtube
+from plugins.browsing import browser_text, github, pdf
+from plugins.youtube import youtube
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 slack = AsyncApp(token=os.environ.get("SLACK_BOT_TOKEN"))

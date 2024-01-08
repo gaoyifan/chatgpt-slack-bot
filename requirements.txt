@@ -4,3 +4,4 @@ openai~=1.6.1
 pyautogen~=0.2.3
 pony
 httpx[http2]
+yt-dlp
