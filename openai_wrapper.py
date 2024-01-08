@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import traceback
 from pprint import pprint
 from typing import Annotated, Any, AsyncGenerator, AsyncIterator, Callable, Dict, List
 
@@ -41,10 +42,15 @@ class OpenAIWrapper:
             func_name = func["name"]
             func_to_call = self.available_funcs[func_name]
             func_args = json.loads(func["arguments"])
-            if asyncio.iscoroutinefunction(func_to_call):
-                func_return = await func_to_call(**func_args)
-            else:
-                func_return = func_to_call(**func_args)
+            try:
+                if asyncio.iscoroutinefunction(func_to_call):
+                    func_return = await func_to_call(**func_args)
+                else:
+                    func_return = func_to_call(**func_args)
+            except Exception as e:
+                func_return = f"(Exception in function call: {e})"
+                logging.error("Exception in function call: %s", e)
+                traceback.print_exc()
             return {
                 "tool_call_id": id,
                 "role": "tool",
@@ -94,11 +100,7 @@ class OpenAIWrapper:
                         yield f"(finish: {choice.finish_reason})"
                         logging.error("Unexpected finish reason: %s", choice.finish_reason)
         elif msg.get("tool_calls"):  # tool calls from assistant
-            try:
-                msg_history += [result async for result in self._execute_function(msg["tool_calls"])]
-            except Exception as e:
-                logging.error("Exception in function call: %s", e)
-                yield f"(Exception in function call: {e})"
+            msg_history += [result async for result in self._execute_function(msg["tool_calls"])]
             async for content in self.generate_reply(msg_history):
                 yield content
         else:
