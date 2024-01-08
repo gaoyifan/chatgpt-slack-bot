@@ -23,7 +23,7 @@ async def _api_request(api_url, url):
                 json_response = {}
             data = json_response.get("data")
             if data:
-                return json.dumps(data)
+                return json.dumps(data, ensure_ascii=False)
             else:
                 return response.content
     except ReadTimeout:
