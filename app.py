@@ -59,6 +59,14 @@ def generate_prompts(thread_msgs: List[Dict]):
 
 @slack.event("message")
 async def message_handler(event: Dict, say: AsyncSay, client: AsyncWebClient):
+    async def update_response():
+        nonlocal response_msg, response, channel
+        await client.chat_update(channel=channel, ts=response_msg["ts"], text=response)
+
+    async def new_response(msg):
+        nonlocal thread_ts
+        return await say(msg, thread_ts=thread_ts, username="AI Assistant")
+
     logging.debug("event: %s", event)
     if "hidden" in event:
         logging.debug("hidden message")
@@ -74,12 +82,18 @@ async def message_handler(event: Dict, say: AsyncSay, client: AsyncWebClient):
     response = ""
     last_send_time = datetime.now()
     old_prompts_len = len(prompts)
-    response_msg = await say("(Thinking...)", thread_ts=thread_ts, username="AI Assistant")
+    response_msg = await new_response("(Thinking...)")
     try:
         async for delta in openai.generate_reply(prompts):
-            response += delta
+            if len(response.encode("utf-8")) + len(delta.encode("utf-8")) > 3000:  # slack message length limit
+                await update_response()
+                response = delta
+                response_msg = await new_response(response)
+                last_send_time = datetime.now()
+            else:
+                response += delta
             if (datetime.now() - last_send_time).total_seconds() > 1:
-                await client.chat_update(channel=channel, ts=response_msg["ts"], text=response)
+                await update_response()
                 last_send_time = datetime.now()
     except Exception as e:
         response += f"(Exception when generating reply: {e})"
@@ -87,7 +101,7 @@ async def message_handler(event: Dict, say: AsyncSay, client: AsyncWebClient):
         traceback.print_exc()
     if len(prompts) > old_prompts_len:  # new tool calls from assistant
         add_tool_call_prompts(channel, response_msg["ts"], prompts[old_prompts_len:], thread_ts)
-    await client.chat_update(channel=channel, ts=response_msg["ts"], text=response)
+    await update_response()
 
 
 # clear all messages in the IM
