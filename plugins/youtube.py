@@ -18,6 +18,25 @@ def result_length(r):
     return len(json.dumps(r, ensure_ascii=False).encode())
 
 
+def find_audio_files(path, extensions):
+    return [f for f in os.listdir(path) if any(f.endswith(ext) for ext in extensions)]
+
+
+def find_audio_format_id(info):
+    size = 0
+    format_id = None
+    for f in info["formats"]:
+        if (
+            f["ext"] in ["webm", "m4a", "mp4"]
+            and f["vcodec"] == "none"
+            and f.get("filesize")
+            and size < f["filesize"] < 20971520
+        ):
+            size = f["filesize"]
+            format_id = f["format_id"]
+    return format_id
+
+
 @add_schema("Fetches the title, associated channel, description, and subtitles of a YouTube video.")
 async def youtube(url: Annotated[str, "URL of the YouTube video."]) -> str:
     logging.debug("youtube: %s", url)
@@ -73,23 +92,12 @@ async def youtube(url: Annotated[str, "URL of the YouTube video."]) -> str:
                 break
 
     if subtitle is None:  # download audio and transcribe
-        # Instead of raising an error, now it tries to download and transcribe the audio.
         with tempfile.TemporaryDirectory() as tmpdir:
-            audio_tmpl = f"{tmpdir}/audio.%(ext)s"
-            audio_path = f"{tmpdir}/audio.mp3"
-            audio_options = {
-                "format": "bestaudio/best",
-                "outtmpl": audio_tmpl,
-                "postprocessors": [
-                    {
-                        "key": "FFmpegExtractAudio",
-                        "preferredcodec": "mp3",
-                        "preferredquality": "192",
-                    }
-                ],
-            }
+            audio_options = {"format": find_audio_format_id(info), "outtmpl": f"{tmpdir}/audio.%(ext)s"}
             with yt_dlp.YoutubeDL(audio_options) as ydl:
                 ydl.download([url])
+            audio_file = find_audio_files(tmpdir, [".webm", ".m4a", ".mp4"])[0]
+            audio_path = f"{tmpdir}/{audio_file}"
             try:
                 with open(audio_path, "rb") as audio_file:
                     transcript_response = await openai_client.audio.transcriptions.create(
