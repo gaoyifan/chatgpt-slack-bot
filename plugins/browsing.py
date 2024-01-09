@@ -6,7 +6,7 @@ from typing import Annotated
 
 from httpx import AsyncClient, ReadTimeout
 
-from plugin import add_schema
+from plugin import tool_call
 
 
 # using API from @SmartHypercube
@@ -32,22 +32,22 @@ async def _api_request(api_url, url):
         return f"(Exception in tool call: {e})"
 
 
-@add_schema("Open a webpage using headless Chromium and extracts the title and all displayed text from the page.")
+@tool_call("Open a webpage using headless Chromium and extracts the title and all displayed text from the page.")
 async def browser_text(url: Annotated[str, "URL of the webpage."]) -> str:
     return await _api_request(os.environ["BROWSER_TEXT_API_URL"], url)
 
 
-@add_schema("Retrieves metadata and the README file of a GitHub repository.")
+@tool_call("Retrieves metadata and the README file of a GitHub repository.")
 async def github(url: Annotated[str, "URL of the GitHub repository."]) -> str:
     return await _api_request(os.environ["GITHUB_API_URL"], url)
 
 
-@add_schema("Downloads a PDF file and extracts text from it.")
+@tool_call("Downloads a PDF file and extracts text from it.")
 async def pdf(url: Annotated[str, "URL of the PDF file"]) -> str:
     return await _api_request(os.environ["PDF_API_URL"], url)
 
 
-@add_schema("Fetches the title, associated channel, description, and subtitles of a YouTube video.")
+@tool_call("Fetches the title, associated channel, description, and subtitles of a YouTube video.")
 async def youtube(url: Annotated[str, "URL of the YouTube video."]) -> str:
     return await _api_request(os.environ["YOUTUBE_API_URL"], url)
 

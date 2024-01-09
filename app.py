@@ -8,10 +8,11 @@ from typing import Dict, List
 
 from pony.orm import *
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
-from slack_bolt.async_app import AsyncApp, AsyncBoltContext, AsyncSay
+from slack_bolt.async_app import AsyncApp, AsyncSay
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
 
+from database import db
 from openai_wrapper import OpenAIWrapper
 from plugins.browsing import browser_text, github, pdf
 from plugins.youtube import youtube
@@ -19,7 +20,6 @@ from plugins.youtube import youtube
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 slack = AsyncApp(token=os.environ.get("SLACK_BOT_TOKEN"))
 openai = OpenAIWrapper()
-db = Database()
 
 
 class SlackToolCallPrompt(db.Entity):
@@ -27,10 +27,6 @@ class SlackToolCallPrompt(db.Entity):
     channel = Required(str)
     thread_ts = Optional(str)
     prompts = Required(Json)
-
-
-db.bind(provider="sqlite", filename="db.sqlite", create_db=True)
-db.generate_mapping(create_tables=True, check_tables=True)
 
 
 @db_session
@@ -125,6 +121,7 @@ async def clear_all_history(ack, body, client: AsyncWebClient):
 
 
 async def main():
+    db.generate_mapping(create_tables=True, check_tables=True)
     openai.add_function(browser_text)
     openai.add_function(github)
     openai.add_function(pdf)

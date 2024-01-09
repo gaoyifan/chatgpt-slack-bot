@@ -8,7 +8,7 @@ from typing import Annotated, Any, AsyncGenerator, AsyncIterator, Callable, Dict
 
 from openai import AsyncOpenAI
 
-from plugin import add_schema
+from plugin import tool_call
 
 
 class OpenAIWrapper:
@@ -118,7 +118,7 @@ class OpenAIWrapper:
         )
 
 
-@add_schema("A timer function.")
+@tool_call("A timer function.")
 async def timer(num_seconds: Annotated[int, "Number of seconds in the timer."]) -> str:
     print(f"Timer started for {num_seconds} seconds.")
     await asyncio.sleep(num_seconds)

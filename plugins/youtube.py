@@ -7,7 +7,7 @@ from typing import Annotated
 from openai import AsyncOpenAI
 import yt_dlp
 
-from plugin import add_schema
+from plugin import tool_call
 
 max_result_length = 6291556
 openai_audio_model = os.getenv("OPENAI_AUDIO_MODEL", "whisper-1")
@@ -37,7 +37,7 @@ def find_audio_format_id(info):
     return format_id
 
 
-@add_schema("Fetches the title, associated channel, description, and subtitles of a YouTube video.")
+@tool_call("Fetches the title, associated channel, description, and subtitles of a YouTube video.", cache=True)
 async def youtube(url: Annotated[str, "URL of the YouTube video."]) -> str:
     logging.debug("youtube: %s", url)
 
