@@ -40,6 +40,13 @@ class OpenAIWrapper:
             id = tool_call["id"]
             func = tool_call["function"]
             func_name = func["name"]
+            if func_name not in self.available_funcs:
+                return {
+                    "tool_call_id": id,
+                    "role": "tool",
+                    "name": func_name,
+                    "content": f"(Unknown function: {func_name})",
+                }
             func_to_call = self.available_funcs[func_name]
             func_args = json.loads(func["arguments"])
             try:
