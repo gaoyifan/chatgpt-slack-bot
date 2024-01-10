@@ -16,6 +16,7 @@ from database import db
 from openai_wrapper import OpenAIWrapper
 from plugins.browsing import browser_text, github, pdf
 from plugins.youtube import youtube
+from plugins.search import search
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 slack = AsyncApp(token=os.environ.get("SLACK_BOT_TOKEN"))
@@ -126,6 +127,7 @@ async def main():
     openai.add_function(github)
     openai.add_function(pdf)
     openai.add_function(youtube)
+    openai.add_function(search)
     await AsyncSocketModeHandler(slack, os.environ["SLACK_APP_TOKEN"]).start_async()
 
 
