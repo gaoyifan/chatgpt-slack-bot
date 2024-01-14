@@ -27,13 +27,13 @@ class OpenAIWrapper:
         await self.openai.close()
 
     def add_function(self, func):
-        self.available_funcs[func.schema["name"]] = func
+        self.available_funcs[func.__name__] = func
 
     def _get_tools_schema(self):
         if not self.available_funcs:
             # openai.chat.completions.create() will fail with tools={}, so we return None instead
             return None
-        return [{"type": "function", "function": func.schema} for func in self.available_funcs.values()]
+        return [func.schema for func in self.available_funcs.values()]
 
     async def _execute_function(self, tool_calls: List[Dict[str, Any]]) -> AsyncIterator[Dict[str, Any]]:
         async def execute_tool_call(tool_call):
