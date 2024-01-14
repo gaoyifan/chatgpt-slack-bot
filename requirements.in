@@ -1,0 +1,7 @@
+slack_bolt
+aiohttp
+openai~=1.6.1
+pyautogen==0.2.6
+pony
+httpx[http2]
+yt-dlp
