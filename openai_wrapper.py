@@ -16,7 +16,7 @@ class OpenAIWrapper:
         self.available_funcs: Dict[str, Callable] = {}
         api_key = os.getenv("OPENAI_API_KEY")
         self.openai = AsyncOpenAI(api_key=api_key)
-        self.model = os.getenv("OPENAI_MODEL")
+        self.model = os.environ.get("OPENAI_MODEL", "gpt-4-1106-preview")
         assert api_key is not None
         assert self.model is not None
 
