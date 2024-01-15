@@ -1,4 +1,7 @@
+import os
+
 from pony.orm import Database
 
 db = Database()
-db.bind(provider="sqlite", filename="db.sqlite", create_db=True)
+db_path = os.environ.get("DB_PATH", "db.sqlite")
+db.bind(provider="sqlite", filename=db_path, create_db=True)
