@@ -1,8 +1,9 @@
+import asyncio
 import json
 import logging
 import os
 import tempfile
-from typing import Annotated
+from typing import Annotated, Callable
 
 import yt_dlp
 
@@ -10,6 +11,11 @@ from plugin import tool_call
 from transcribe import transcribe
 
 max_result_length = 6291556
+
+
+async def run_sync_in_executor(func: Callable, *args, **kwargs):
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, lambda: func(*args, **kwargs))
 
 
 def result_length(r):
@@ -25,10 +31,10 @@ def find_audio_format_id(info):
     format_id = None
     for f in info["formats"]:
         if (
-            f["ext"] in ["webm", "m4a", "mp4"]
-            and f["vcodec"] == "none"
-            and f.get("filesize")
-            and size < f["filesize"] < 20971520
+                f["ext"] in ["webm", "m4a", "mp4"]
+                and f["vcodec"] == "none"
+                and f.get("filesize")
+                and size < f["filesize"] < 20971520
         ):
             size = f["filesize"]
             format_id = f["format_id"]
@@ -46,7 +52,7 @@ async def youtube(url: Annotated[str, "URL of the YouTube video."]) -> str:
     autosub_preferences = ["en"]
 
     with yt_dlp.YoutubeDL() as ydl:
-        info = ydl.extract_info(url, download=False, process=False)
+        info = await run_sync_in_executor(ydl.extract_info, url, download=False, process=False)
 
     if "title" in info:
         data["title"] = info["title"]
@@ -93,7 +99,7 @@ async def youtube(url: Annotated[str, "URL of the YouTube video."]) -> str:
         with tempfile.TemporaryDirectory() as tmpdir:
             audio_options = {"format": find_audio_format_id(info), "outtmpl": f"{tmpdir}/audio.%(ext)s"}
             with yt_dlp.YoutubeDL(audio_options) as ydl:
-                ydl.download([url])
+                await run_sync_in_executor(ydl.download, [url])
             audio_file = find_audio_files(tmpdir, [".webm", ".m4a", ".mp4"])[0]
             audio_path = f"{tmpdir}/{audio_file}"
             try:
@@ -118,7 +124,7 @@ async def youtube(url: Annotated[str, "URL of the YouTube video."]) -> str:
                 options["writeautomaticsub"] = True
 
             with yt_dlp.YoutubeDL(options) as ydl:
-                ydl.download([url])
+                await run_sync_in_executor(ydl.download, [url])
 
             with open(f"{tmpdir}/output.{subtitle[1]}.json3") as f:
                 json3 = json.load(f)
@@ -158,3 +164,21 @@ async def youtube(url: Annotated[str, "URL of the YouTube video."]) -> str:
                 left = mid
         result["data"]["transcript"] = transcript[:left]
     return json.dumps(result["data"], ensure_ascii=False)
+
+
+async def test_youtube():
+    from database import db
+    db.generate_mapping(create_tables=True, check_tables=True)
+
+    async def async_timer(seconds):
+        for i in range(seconds):
+            print(f"Timer: {i}s")
+            await asyncio.sleep(1)
+
+    _timer_task = asyncio.create_task(async_timer(100000))
+    url = "https://www.youtube.com/watch?v=5cqaHCQ4pi4"
+    print(await youtube(url))
+
+
+if __name__ == "__main__":
+    asyncio.run(test_youtube())

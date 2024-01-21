@@ -65,7 +65,7 @@ docker run -d --env-file=.env gaoyifan/chatgpt-slack-bot
 
 ## TODO
 
-- [ ] Develop an asynchronous wrapper for yt-dlp.
+- [X] Develop an asynchronous wrapper for yt-dlp.
 - [ ] Implement a code interpreter.
 
 ## Contributing
