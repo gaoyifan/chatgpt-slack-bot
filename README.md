@@ -6,6 +6,12 @@ The ChatGPT Slack Bot integrates advanced GPT models into Slack, offering functi
 video data extraction, and search capabilities with Google and Bing. This integration enhances user interaction within
 Slack workspaces by enabling more dynamic and intelligent responses.
 
+## Features
+
+* **LLM Generation**: Generating responses to user messages using large language models.
+* **Voice Input**: Transcribing Slack audio clips and generating responses based on the transcriptions.
+* **Plugin System**: Easily extend the bot's functionality with [plugins](#plugins).
+
 ## Installation
 
 ### Prerequisites
