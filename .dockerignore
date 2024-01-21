@@ -1,0 +1,17 @@
+.env
+.env.*
+.idea/
+**/__pycache__/
+db.sqlite
+audio.*
+
+.*
+
+justfile
+Dockerfile
+env.example
+LICENSE
+requirements.in
+
+*.md
+*.yaml
