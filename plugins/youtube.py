@@ -4,14 +4,12 @@ import os
 import tempfile
 from typing import Annotated
 
-from openai import AsyncOpenAI
 import yt_dlp
 
 from plugin import tool_call
+from transcribe import transcribe
 
 max_result_length = 6291556
-openai_audio_model = os.getenv("OPENAI_AUDIO_MODEL", "whisper-1")
-openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 def result_length(r):
@@ -100,11 +98,8 @@ async def youtube(url: Annotated[str, "URL of the YouTube video."]) -> str:
             audio_path = f"{tmpdir}/{audio_file}"
             try:
                 with open(audio_path, "rb") as audio_file:
-                    transcript_response = await openai_client.audio.transcriptions.create(
-                        model=openai_audio_model,
-                        file=audio_file,
-                    )
-                transcript = transcript_response.text
+                    transcript_response = await transcribe(audio_file)
+                transcript = '\n'.join([seg["text"] for seg in transcript_response.segments])
                 logging.debug("transcript success")
             except Exception as e:
                 logging.error(f"Error in transcribing audio: {e}")
