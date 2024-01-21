@@ -6,6 +6,7 @@ from datetime import datetime
 from pprint import pprint
 from typing import Dict, List
 
+import aiohttp
 from pony.orm import *
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncApp, AsyncSay
@@ -15,15 +16,27 @@ from slack_sdk.web.async_client import AsyncWebClient
 from database import db
 from openai_wrapper import OpenAIWrapper
 from plugins.browsing import browser_text, github, pdf
-from plugins.youtube import youtube
 from plugins.search import search
+from plugins.youtube import youtube
+from transcribe import transcribe
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
 slack = AsyncApp(token=os.environ.get("SLACK_BOT_TOKEN"))
 openai = OpenAIWrapper()
 
 
-class SlackToolCallPrompt(db.Entity):
+async def download_file(url):
+    logging.debug("Downloading file: %s", url)
+    async with aiohttp.ClientSession() as aiohttp_session:
+        async with aiohttp_session.get(url, headers={"Authorization": f"Bearer {os.environ['SLACK_BOT_TOKEN']}"}) as r:
+            if not r.ok:
+                logging.error("Failed to download file: %s", url)
+                return
+            return await r.content.read()
+
+
+class SlackExtraPrompt(db.Entity):
+    _table_ = "SlackToolCallPrompt"  # historical reasons
     ts = PrimaryKey(str)
     channel = Required(str)
     thread_ts = Optional(str)
@@ -31,21 +44,27 @@ class SlackToolCallPrompt(db.Entity):
 
 
 @db_session
-def get_tool_call_prompts(msg_ts):
-    prompt = SlackToolCallPrompt.get(ts=msg_ts)
+def get_extra_prompts(msg_ts):
+    prompt = SlackExtraPrompt.get(ts=msg_ts)
     return prompt.prompts if prompt else []
 
 
 @db_session
-def add_tool_call_prompts(channel, msg_ts, prompts, thread_ts=None):
-    SlackToolCallPrompt(channel=channel, ts=msg_ts, thread_ts=thread_ts, prompts=prompts)
+def add_extra_prompts(channel, msg_ts, prompts, thread_ts=None):
+    if SlackExtraPrompt.exists(ts=msg_ts):
+        prompt = SlackExtraPrompt.get(ts=msg_ts)
+        prompt.prompts += prompts
+    else:
+        SlackExtraPrompt(ts=msg_ts, channel=channel, thread_ts=thread_ts, prompts=prompts)
 
 
 def generate_prompts(thread_msgs: List[Dict]):
     yield {"role": "system", "content": "You are a helpful assistant."}
     for msg in thread_msgs:
-        for p in get_tool_call_prompts(msg["ts"]):
+        for p in get_extra_prompts(msg["ts"]):
             yield p
+        if not msg["text"]:  # skip empty messages, e.g. audio prompts
+            continue
         if "bot_id" in msg:
             yield {"role": "assistant", "content": msg["text"]}
         elif "user" in msg:
@@ -57,8 +76,8 @@ def generate_prompts(thread_msgs: List[Dict]):
 @slack.event("message")
 async def message_handler(event: Dict, say: AsyncSay, client: AsyncWebClient):
     async def update_response():
-        nonlocal response_msg, response, channel
-        await client.chat_update(channel=channel, ts=response_msg["ts"], text=response)
+        nonlocal slack_response, response, channel
+        await client.chat_update(channel=channel, ts=slack_response["ts"], text=response)
 
     async def new_response(msg):
         nonlocal thread_ts
@@ -70,22 +89,34 @@ async def message_handler(event: Dict, say: AsyncSay, client: AsyncWebClient):
         return
     channel = event["channel"]
     thread_ts = event.get("thread_ts") or event["ts"]
+
+    # transcribe audio files
+    for file in event.get("files", []):
+        if file.get("subtype") == "slack_audio":
+            logging.debug("transcribing audio file")
+            url = file["url_private"]
+            transcript = await transcribe(await download_file(url))
+            await client.chat_postEphemeral(channel=channel, user=event["user"], username="AI Assistant",
+                                            text=f"You: {transcript.text}", thread_ts=thread_ts)
+            add_extra_prompts(channel, event["ts"], [{"role": "user", "content": transcript.text}], thread_ts)
+
     try:
         thread_msgs = await client.conversations_replies(channel=channel, ts=thread_ts)
     except SlackApiError:
         logging.error("Failed to fetch thread messages. channel: %s, ts: %s", channel, thread_ts)
         return
     prompts = list(generate_prompts(thread_msgs["messages"]))
+    logging.debug("prompts: %s", prompts)
     response = ""
     last_send_time = datetime.now()
     old_prompts_len = len(prompts)
-    response_msg = await new_response("(Thinking...)")
+    slack_response = await new_response("(Thinking...)")
     try:
         async for delta in openai.generate_reply(prompts):
             if len(response.encode("utf-8")) + len(delta.encode("utf-8")) > 3000:  # slack message length limit
                 await update_response()
                 response = delta
-                response_msg = await new_response(response)
+                slack_response = await new_response(response)
                 last_send_time = datetime.now()
             else:
                 response += delta
@@ -97,7 +128,7 @@ async def message_handler(event: Dict, say: AsyncSay, client: AsyncWebClient):
         logging.error("Exception when generating reply: %s", e)
         traceback.print_exc()
     if len(prompts) > old_prompts_len:  # new tool calls from assistant
-        add_tool_call_prompts(channel, response_msg["ts"], prompts[old_prompts_len:], thread_ts)
+        add_extra_prompts(channel, slack_response["ts"], prompts[old_prompts_len:], thread_ts)
     await update_response()
 
 
