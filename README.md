@@ -34,7 +34,7 @@ Slack workspaces by enabling more dynamic and intelligent responses.
 Deploy using Docker with the following command:
 
 ```shell
-docker run -d --env-file=.env gaoyifan/chatgpt-slack-bot
+docker run -d --env-file=.env ghcr.io/gaoyifan/chatgpt-slack-bot:master
 ```
 
 ## Plugins
