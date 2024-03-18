@@ -96,8 +96,13 @@ async def message_handler(event: Dict, say: AsyncSay, client: AsyncWebClient):
             logging.debug("transcribing audio file")
             url = file["url_private"]
             transcript = await transcribe(await download_file(url))
-            await client.chat_postEphemeral(channel=channel, user=event["user"], username="AI Assistant",
-                                            text=f"You: {transcript.text}", thread_ts=thread_ts)
+            await client.chat_postEphemeral(
+                channel=channel,
+                user=event["user"],
+                username="AI Assistant",
+                text=f"You: {transcript.text}",
+                thread_ts=thread_ts,
+            )
             add_extra_prompts(channel, event["ts"], [{"role": "user", "content": transcript.text}], thread_ts)
 
     try:

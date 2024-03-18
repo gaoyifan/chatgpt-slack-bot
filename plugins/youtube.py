@@ -31,10 +31,10 @@ def find_audio_format_id(info):
     format_id = None
     for f in info["formats"]:
         if (
-                f["ext"] in ["webm", "m4a", "mp4"]
-                and f["vcodec"] == "none"
-                and f.get("filesize")
-                and size < f["filesize"] < 20971520
+            f["ext"] in ["webm", "m4a", "mp4"]
+            and f["vcodec"] == "none"
+            and f.get("filesize")
+            and size < f["filesize"] < 20971520
         ):
             size = f["filesize"]
             format_id = f["format_id"]
@@ -105,7 +105,7 @@ async def youtube(url: Annotated[str, "URL of the YouTube video."]) -> str:
             try:
                 with open(audio_path, "rb") as audio_file:
                     transcript_response = await transcribe(audio_file)
-                transcript = '\n'.join([seg["text"] for seg in transcript_response.segments])
+                transcript = "\n".join([seg["text"] for seg in transcript_response.segments])
                 logging.debug("transcript success")
             except Exception as e:
                 logging.error(f"Error in transcribing audio: {e}")
@@ -168,6 +168,7 @@ async def youtube(url: Annotated[str, "URL of the YouTube video."]) -> str:
 
 async def test_youtube():
     from database import db
+
     db.generate_mapping(create_tables=True, check_tables=True)
 
     async def async_timer(seconds):

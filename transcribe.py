@@ -12,10 +12,7 @@ audio_model = os.getenv("OPENAI_AUDIO_MODEL", "whisper-1")
 
 
 async def transcribe(audio_file):
-    return await client.audio.transcriptions.create(
-        model=audio_model,
-        file=audio_file
-    )
+    return await client.audio.transcriptions.create(model=audio_model, file=audio_file)
 
 
 async def main():
