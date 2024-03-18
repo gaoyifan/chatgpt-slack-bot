@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import traceback
@@ -170,6 +171,62 @@ async def set_openai_key(ack, body, client: AsyncWebClient):
     logging.info("Setting OpenAI key: %s", key)
     openai.set_openai_key(key)
     await client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], text="OpenAI key set")
+
+
+# dump all messages to json
+@slack.command("/dump-conversations")
+async def dump_conversation(ack, body, client: AsyncWebClient):
+    await ack()
+
+    await client.chat_postEphemeral(
+        channel=body["channel_id"],
+        user=body["user_id"],
+        text="Dumping conversations to JSON file, this may take up to an hour according to your conversation size, "
+        "please wait...",
+    )
+
+    try:
+        h = await client.conversations_history(channel=body["channel_id"], limit=999)
+        assert h["ok"]
+        msg_history = h["messages"]
+
+        while h["has_more"]:
+            await asyncio.sleep(1)  # need to wait 1 sec before next call due to rate limits
+            h = await client.conversations_history(
+                channel=body["channel_id"], limit=999, cursor=h["response_metadata"]["next_cursor"]
+            )
+            assert h["ok"]
+            messages = h["messages"]
+            msg_history += messages
+
+        # receive all threads
+        msg_replies = []
+        for msg in msg_history:
+            if "thread_ts" in msg:
+                await asyncio.sleep(1)
+                thread = await client.conversations_replies(channel=body["channel_id"], ts=msg["ts"])
+                msg_replies.extend(thread["messages"])
+
+        msg_all = msg_history + msg_replies
+        msg_all.sort(key=lambda x: float(x["ts"]))
+        msg_json = json.dumps(msg_all, ensure_ascii=False)
+
+        await client.files_upload(
+            channels=body["channel_id"],
+            content=msg_json,
+            title="conversations of user {} before {}".format(body["user_id"], datetime.now().strftime("%Y-%m-%d")),
+            filename="conversation.json",
+            initial_comment="Fetched a total of {} messages.".format(len(msg_all)),
+            filetype="json",
+        )
+    except Exception as e:
+        logging.error("Failed to dump conversations to JSON file: %s", e)
+        print(traceback.format_exc())
+        await client.chat_postEphemeral(
+            channel=body["channel_id"],
+            user=body["user_id"],
+            text=f"Failed to dump conversation to JSON file: {e}",
+        )
 
 
 async def main():
