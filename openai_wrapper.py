@@ -26,6 +26,9 @@ class OpenAIWrapper:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.openai.close()
 
+    def set_openai_key(self, api_key):
+        self.openai.api_key = api_key
+
     def add_function(self, func):
         self.available_funcs[func.__name__] = func
 

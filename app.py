@@ -157,6 +157,21 @@ async def clear_all_history(ack, body, client: AsyncWebClient):
                 await try_delete(body["channel_id"], reply["ts"])
 
 
+# set OpenAI key by slash command
+@slack.command("/set-openai-key")
+async def set_openai_key(ack, body, client: AsyncWebClient):
+    await ack()
+    if os.environ.get("ALLOW_SET_OPENAI_KEY") != "true":
+        await client.chat_postEphemeral(
+            channel=body["channel_id"], user=body["user_id"], text="This command is disabled"
+        )
+        return
+    key = body["text"]
+    logging.info("Setting OpenAI key: %s", key)
+    openai.set_openai_key(key)
+    await client.chat_postEphemeral(channel=body["channel_id"], user=body["user_id"], text="OpenAI key set")
+
+
 async def main():
     db.generate_mapping(create_tables=True, check_tables=True)
     openai.add_function(browser_text)
