@@ -5,3 +5,4 @@ pyautogen==0.2.6
 pony
 httpx[http2]
 yt-dlp
+tiktoken==0.5.2 # higher versions are broken for linux/arm64, although it's not a direct dependency
