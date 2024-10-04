@@ -27,18 +27,7 @@ def find_audio_files(path, extensions):
 
 
 def find_audio_format_id(info):
-    size = 0
-    format_id = None
-    for f in info["formats"]:
-        if (
-            f["ext"] in ["webm", "m4a", "mp4"]
-            and f["vcodec"] == "none"
-            and f.get("filesize")
-            and size < f["filesize"] < 20971520
-        ):
-            size = f["filesize"]
-            format_id = f["format_id"]
-    return format_id
+    return "bestaudio[filesize<20M]"
 
 
 @tool_call("Fetches the title, associated channel, description, and subtitles of a YouTube video.", cache=True)
