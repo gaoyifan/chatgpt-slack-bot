@@ -94,7 +94,7 @@ async def youtube(url: Annotated[str, "URL of the YouTube video."]) -> str:
             try:
                 with open(audio_path, "rb") as audio_file:
                     transcript_response = await transcribe(audio_file)
-                transcript = "\n".join([seg["text"] for seg in transcript_response.segments])
+                transcript = transcript_response.text
                 logging.debug("transcript success")
             except Exception as e:
                 logging.error(f"Error in transcribing audio: {e}")
